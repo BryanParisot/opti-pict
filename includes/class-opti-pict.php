@@ -27,6 +27,13 @@ final class Opti_Pict {
 	private static $instance = null;
 
 	/**
+	 * Attachment IDs resolved from original URLs during the current request.
+	 *
+	 * @var array<string,int>
+	 */
+	private $source_lookup = array();
+
+	/**
 	 * Get the plugin instance.
 	 *
 	 * @return Opti_Pict
@@ -49,7 +56,39 @@ final class Opti_Pict {
 		add_action( 'wp_ajax_opti_pict_optimize', array( $this, 'ajax_optimize' ) );
 		add_action( 'wp_ajax_opti_pict_restore', array( $this, 'ajax_restore' ) );
 		add_action( 'wp_ajax_opti_pict_save_report', array( $this, 'ajax_save_report' ) );
+		add_action( 'template_redirect', array( $this, 'start_frontend_image_buffer' ), 0 );
 		add_filter( 'wp_content_img_tag', array( $this, 'use_optimized_content_image' ), 20, 3 );
+		add_filter( 'the_content', array( $this, 'use_optimized_images_in_html' ), 99 );
+		add_filter( 'render_block', array( $this, 'use_optimized_images_in_html' ), 99 );
+		add_filter( 'widget_text_content', array( $this, 'use_optimized_images_in_html' ), 99 );
+		add_filter( 'post_thumbnail_html', array( $this, 'use_optimized_images_in_html' ), 99 );
+		add_filter( 'elementor/frontend/the_content', array( $this, 'use_optimized_images_in_html' ), 99 );
+		add_filter( 'elementor/widget/render_content', array( $this, 'use_optimized_images_in_html' ), 99 );
+	}
+
+	/**
+	 * Start a final HTML pass for theme areas outside normal content filters.
+	 *
+	 * Headers, footers and some page builders print attachment markup directly.
+	 * Buffering only public HTML requests lets those image tags use the same safe
+	 * URL replacement as filtered post content.
+	 */
+	public function start_frontend_image_buffer() {
+		if ( is_admin() || wp_doing_ajax() || wp_doing_cron() || is_feed() || is_trackback() || is_robots() ) {
+			return;
+		}
+
+		ob_start( array( $this, 'rewrite_frontend_document' ) );
+	}
+
+	/**
+	 * Replace optimized image URLs in a complete frontend document.
+	 *
+	 * @param string $html Complete response body.
+	 * @return string
+	 */
+	public function rewrite_frontend_document( $html ) {
+		return $this->replace_optimized_images_in_html( $html );
 	}
 
 	/**
@@ -65,62 +104,279 @@ final class Opti_Pict {
 	 */
 	public function use_optimized_content_image( $image, $context, $attachment_id ) {
 		unset( $context );
+		return $this->replace_optimized_images_in_html( $image, absint( $attachment_id ) );
+	}
 
-		if ( ! $attachment_id || ! class_exists( 'WP_HTML_Tag_Processor' ) ) {
-			return $image;
+	/**
+	 * Replace original image URLs in rendered content and page-builder widgets.
+	 *
+	 * The second argument deliberately accepts optional filter context used by some
+	 * builders. It is not trusted or required for URL resolution.
+	 *
+	 * @param string $html    Rendered HTML.
+	 * @param mixed  $context Optional filter context.
+	 * @return string
+	 */
+	public function use_optimized_images_in_html( $html, $context = null ) {
+		unset( $context );
+		return $this->replace_optimized_images_in_html( $html );
+	}
+
+	/**
+	 * Rewrite image attributes that still point to an original JPEG or PNG.
+	 *
+	 * @param string $html                 Rendered HTML.
+	 * @param int    $forced_attachment_id Attachment ID supplied by WordPress.
+	 * @return string
+	 */
+	private function replace_optimized_images_in_html( $html, $forced_attachment_id = 0 ) {
+		if ( ! is_string( $html ) || '' === $html || false === stripos( $html, '<img' ) || ! class_exists( 'WP_HTML_Tag_Processor' ) ) {
+			return $html;
 		}
 
-		$backup = get_post_meta( $attachment_id, self::BACKUP_META, true );
-		if ( ! is_array( $backup ) || empty( $backup['attached_file'] ) ) {
-			return $image;
+		$processor = new WP_HTML_Tag_Processor( $html );
+		while ( $processor->next_tag( 'img' ) ) {
+			$attachment_id = $forced_attachment_id ? $forced_attachment_id : $this->get_attachment_id_from_tag( $processor );
+			if ( $attachment_id ) {
+				$this->replace_current_image_tag( $processor, $attachment_id );
+			}
+
+			if ( $forced_attachment_id ) {
+				break;
+			}
 		}
 
-		$processor = new WP_HTML_Tag_Processor( $image );
-		if ( ! $processor->next_tag( 'img' ) ) {
-			return $image;
+		return $processor->get_updated_html();
+	}
+
+	/**
+	 * Resolve an attachment from standard classes, builder attributes or its URL.
+	 *
+	 * @param WP_HTML_Tag_Processor $processor HTML processor on an image tag.
+	 * @return int
+	 */
+	private function get_attachment_id_from_tag( $processor ) {
+		$class_name = $processor->get_attribute( 'class' );
+		if ( is_string( $class_name ) && preg_match( '/(?:^|\s)wp-image-(\d+)(?:\s|$)/', $class_name, $matches ) ) {
+			return absint( $matches[1] );
 		}
 
-		$source = $processor->get_attribute( 'src' );
-		if ( ! is_string( $source ) || '' === $source ) {
-			return $image;
+		foreach ( array( 'data-attachment-id', 'data-id' ) as $attribute ) {
+			$attachment_id = absint( $processor->get_attribute( $attribute ) );
+			if ( $attachment_id && 'attachment' === get_post_type( $attachment_id ) ) {
+				return $attachment_id;
+			}
 		}
 
-		$source_path = wp_parse_url( html_entity_decode( $source ), PHP_URL_PATH );
-		if ( ! is_string( $source_path ) ) {
-			return $image;
-		}
-
-		$source_filename = rawurldecode( wp_basename( $source_path ) );
-		$requested_size  = false;
-		if ( wp_basename( $backup['attached_file'] ) === $source_filename ) {
-			$requested_size = 'full';
-		} elseif ( ! empty( $backup['metadata']['sizes'] ) && is_array( $backup['metadata']['sizes'] ) ) {
-			foreach ( $backup['metadata']['sizes'] as $size_name => $size_data ) {
-				if ( ! empty( $size_data['file'] ) && wp_basename( $size_data['file'] ) === $source_filename ) {
-					$requested_size = sanitize_key( $size_name );
-					break;
+		foreach ( array( 'src', 'data-src', 'data-lazy-src', 'data-original' ) as $attribute ) {
+			$source = $processor->get_attribute( $attribute );
+			if ( is_string( $source ) && '' !== $source ) {
+				$attachment_id = $this->find_attachment_by_original_source( $source );
+				if ( $attachment_id ) {
+					return $attachment_id;
 				}
 			}
 		}
 
+		return 0;
+	}
+
+	/**
+	 * Replace URL-bearing attributes on the current image tag.
+	 *
+	 * @param WP_HTML_Tag_Processor $processor    HTML processor on an image tag.
+	 * @param int                   $attachment_id Attachment ID.
+	 * @return bool Whether at least one original URL was replaced.
+	 */
+	private function replace_current_image_tag( $processor, $attachment_id ) {
+		$backup = get_post_meta( $attachment_id, self::BACKUP_META, true );
+		if ( ! is_array( $backup ) || empty( $backup['attached_file'] ) ) {
+			return false;
+		}
+
+		$requested_size    = false;
+		$replaced_src      = false;
+		$source_attributes = array( 'src', 'data-src', 'data-lazy-src', 'data-original' );
+		foreach ( $source_attributes as $attribute ) {
+			$source = $processor->get_attribute( $attribute );
+			if ( ! is_string( $source ) || '' === $source ) {
+				continue;
+			}
+
+			$attribute_size = $this->get_original_image_size( $backup, $source, true );
+			if ( false === $attribute_size ) {
+				continue;
+			}
+
+			$optimized_url = wp_get_attachment_image_url( $attachment_id, $attribute_size );
+			if ( ! $optimized_url ) {
+				continue;
+			}
+
+			$processor->set_attribute( $attribute, $optimized_url );
+			$requested_size = false === $requested_size ? $attribute_size : $requested_size;
+			$replaced_src   = $replaced_src || 'src' === $attribute;
+		}
+
 		if ( false === $requested_size ) {
-			return $image;
+			return false;
 		}
 
-		$optimized_url = wp_get_attachment_image_url( $attachment_id, $requested_size );
-		if ( ! $optimized_url ) {
-			return $image;
-		}
-
-		$processor->set_attribute( 'src', $optimized_url );
 		$srcset = wp_get_attachment_image_srcset( $attachment_id, $requested_size );
 		if ( $srcset ) {
-			$processor->set_attribute( 'srcset', $srcset );
+			if ( $replaced_src || null !== $processor->get_attribute( 'srcset' ) ) {
+				$processor->set_attribute( 'srcset', $srcset );
+			}
+			foreach ( array( 'data-srcset', 'data-lazy-srcset' ) as $attribute ) {
+				if ( null !== $processor->get_attribute( $attribute ) ) {
+					$processor->set_attribute( $attribute, $srcset );
+				}
+			}
 		} else {
 			$processor->remove_attribute( 'srcset' );
+			$processor->remove_attribute( 'data-srcset' );
+			$processor->remove_attribute( 'data-lazy-srcset' );
 		}
 
-		return $processor->get_updated_html();
+		return true;
+	}
+
+	/**
+	 * Determine which original registered image size a URL represents.
+	 *
+	 * @param array<string,mixed> $backup         Original attachment data.
+	 * @param string              $source         Image URL.
+	 * @param bool                $allow_filename Whether a trusted attachment ID allows filename fallback.
+	 * @return string|false
+	 */
+	private function get_original_image_size( $backup, $source, $allow_filename = false ) {
+		$source_path = $this->get_url_path( $source );
+		if ( false === $source_path ) {
+			return false;
+		}
+
+		$attached_file = ltrim( wp_normalize_path( $backup['attached_file'] ), '/' );
+		if ( $this->path_matches_upload_file( $source_path, $attached_file ) ) {
+			return 'full';
+		}
+
+		if ( ! empty( $backup['metadata']['sizes'] ) && is_array( $backup['metadata']['sizes'] ) ) {
+			$directory = dirname( $attached_file );
+			foreach ( $backup['metadata']['sizes'] as $size_name => $size_data ) {
+				if ( empty( $size_data['file'] ) || ! is_string( $size_data['file'] ) ) {
+					continue;
+				}
+				$relative_path = ( '.' === $directory ? '' : trailingslashit( $directory ) ) . wp_basename( $size_data['file'] );
+				if ( $this->path_matches_upload_file( $source_path, $relative_path ) ) {
+					return sanitize_key( $size_name );
+				}
+			}
+		}
+
+		if ( $allow_filename ) {
+			$source_filename = wp_basename( $source_path );
+			if ( wp_basename( $attached_file ) === $source_filename ) {
+				return 'full';
+			}
+
+			foreach ( (array) ( $backup['metadata']['sizes'] ?? array() ) as $size_name => $size_data ) {
+				if ( ! empty( $size_data['file'] ) && wp_basename( $size_data['file'] ) === $source_filename ) {
+					return sanitize_key( $size_name );
+				}
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Resolve a static original URL to an optimized attachment.
+	 *
+	 * @param string $source Image URL.
+	 * @return int
+	 */
+	private function find_attachment_by_original_source( $source ) {
+		$source_path = $this->get_url_path( $source );
+		if ( false === $source_path ) {
+			return 0;
+		}
+
+		$cache_key = md5( $source_path );
+		if ( array_key_exists( $cache_key, $this->source_lookup ) ) {
+			return $this->source_lookup[ $cache_key ];
+		}
+
+		$attachment_id = attachment_url_to_postid( $source );
+		if ( $attachment_id ) {
+			$backup = get_post_meta( $attachment_id, self::BACKUP_META, true );
+			if ( is_array( $backup ) && false !== $this->get_original_image_size( $backup, $source ) ) {
+				$this->source_lookup[ $cache_key ] = absint( $attachment_id );
+				return $this->source_lookup[ $cache_key ];
+			}
+		}
+
+		$filename = wp_basename( $source_path );
+		if ( ! preg_match( '/\.(?:jpe?g|png)$/i', $filename ) ) {
+			$this->source_lookup[ $cache_key ] = 0;
+			return 0;
+		}
+
+		// A verified fallback is needed for builders that store only the old URL.
+		$candidates = get_posts(
+			array(
+				'post_type'              => 'attachment',
+				'post_status'            => 'inherit',
+				'posts_per_page'         => 20,
+				'fields'                 => 'ids',
+				'no_found_rows'          => true,
+				'update_post_meta_cache' => true,
+				'update_post_term_cache' => false,
+				// Serialized backup values obtain a small candidate set; every match is verified below.
+				// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
+				'meta_query'             => array(
+					array(
+						'key'     => self::BACKUP_META,
+						'value'   => $filename,
+						'compare' => 'LIKE',
+					),
+				),
+			)
+		);
+
+		$matches = array();
+		foreach ( $candidates as $candidate_id ) {
+			$backup = get_post_meta( $candidate_id, self::BACKUP_META, true );
+			if ( is_array( $backup ) && false !== $this->get_original_image_size( $backup, $source ) ) {
+				$matches[] = absint( $candidate_id );
+			}
+		}
+
+		$this->source_lookup[ $cache_key ] = 1 === count( $matches ) ? $matches[0] : 0;
+		return $this->source_lookup[ $cache_key ];
+	}
+
+	/**
+	 * Extract a normalized URL path without query parameters.
+	 *
+	 * @param string $url Image URL.
+	 * @return string|false
+	 */
+	private function get_url_path( $url ) {
+		$path = wp_parse_url( html_entity_decode( $url ), PHP_URL_PATH );
+		return is_string( $path ) && '' !== $path ? wp_normalize_path( rawurldecode( $path ) ) : false;
+	}
+
+	/**
+	 * Check that a URL path ends with a specific relative uploads path.
+	 *
+	 * @param string $source_path   URL path.
+	 * @param string $relative_path Relative uploads path.
+	 * @return bool
+	 */
+	private function path_matches_upload_file( $source_path, $relative_path ) {
+		$source_path   = '/' . ltrim( wp_normalize_path( $source_path ), '/' );
+		$relative_path = '/' . ltrim( wp_normalize_path( $relative_path ), '/' );
+		return strlen( $source_path ) >= strlen( $relative_path ) && substr( $source_path, -strlen( $relative_path ) ) === $relative_path;
 	}
 
 	/**
@@ -308,6 +564,7 @@ final class Opti_Pict {
 							<div><span><?php esc_html_e( 'Réduction réelle', 'opti-pict' ); ?></span><strong id="opti-pict-percent">—</strong></div>
 							<div><span><?php esc_html_e( 'Temps économisé', 'opti-pict' ); ?></span><strong id="opti-pict-time-saved">—</strong></div>
 						</div>
+						<p class="opti-pict-info"><?php esc_html_e( 'Sur un site en production, purgez ensuite le cache de page et le CDN pour que le HTML contenant les nouvelles URL WebP soit régénéré.', 'opti-pict' ); ?></p>
 						<button type="button" class="button button-primary" id="opti-pict-new-scan"><?php esc_html_e( 'Analyser à nouveau', 'opti-pict' ); ?></button>
 					</div>
 

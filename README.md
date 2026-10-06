@@ -8,6 +8,7 @@ Opti Pict est une extension WordPress qui convertit localement les images JPEG e
 - conversion WebP locale avec conservation des originaux ;
 - mesure du poids et du temps de transfert économisés ;
 - restauration des fichiers et métadonnées précédents ;
+- remplacement à l’affichage des anciennes URL JPEG/PNG par les URL WebP dans les balises Image du document public, y compris les en-têtes, pieds de page, widgets et constructeurs compatibles ;
 - propositions facultatives de textes alternatifs, titres et identifiants avec l’API OpenAI ;
 - validation humaine obligatoire avant l’application d’une proposition IA.
 
@@ -18,6 +19,8 @@ Opti Pict est une extension WordPress qui convertit localement les images JPEG e
 3. Ouvrez **Médias → Opti Pict**.
 
 WordPress 6.4 ou plus récent et PHP 7.4 ou plus récent sont requis. La création WebP doit être disponible dans GD ou Imagick.
+
+Après une optimisation en production, purgez le cache de page et le CDN afin que les pages soient régénérées avec les URL WebP.
 
 ## Configuration de l’IA
 

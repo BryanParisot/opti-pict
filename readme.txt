@@ -4,7 +4,7 @@ Tags: images, webp, performance, media, seo
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.2.1
+Stable tag: 0.3.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -20,7 +20,7 @@ Opti Pict propose un parcours simple :
 
 Les originaux ne sont jamais supprimés. Une restauration est disponible depuis l’écran Média > Opti Pict. La conversion WebP est entièrement locale et n’envoie aucun fichier à un service externe.
 
-Les URLs des blocs Image existants sont adaptées au moment de l’affichage, sans modifier le contenu enregistré dans les articles.
+Les anciennes URLs JPEG/PNG des balises Image sont adaptées au moment de l’affichage dans le document HTML public, y compris dans les en-têtes, pieds de page, widgets et constructeurs de pages compatibles, sans modifier le contenu enregistré. Après une mise à jour en production, le cache de page et le CDN doivent être purgés afin de régénérer le HTML.
 
 Le module Référencement peut utiliser l’API OpenAI pour proposer un texte alternatif, un titre de média et un identifiant lisible à partir de l’image et de son contexte sur le site. Chaque proposition doit être validée avant application.
 
@@ -51,6 +51,9 @@ Ne placez jamais une vraie clé API dans le code de l’extension, dans un dép�
 3. Lancez l’analyse puis confirmez l’optimisation.
 
 == Changelog ==
+
+= 0.3.0 =
+* Meilleure substitution des anciennes URLs par les fichiers WebP dans les contenus rendus, widgets et constructeurs de pages.
 
 = 0.2.1 =
 * Durcissement de la validation des clés API et des fichiers générés.
