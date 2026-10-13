@@ -24,13 +24,19 @@
 		newScan: document.getElementById( 'opti-pict-new-scan' ),
 		optimize: document.getElementById( 'opti-pict-optimize' ),
 		restore: document.getElementById( 'opti-pict-restore' ),
-		restoreCard: document.getElementById( 'opti-pict-restore-card' )
+		restoreCard: document.getElementById( 'opti-pict-restore-card' ),
+		optimized: document.getElementById( 'opti-pict-optimized' ),
+		optimizedList: document.getElementById( 'opti-pict-optimized-list' )
 	};
 
 	let scanState = resetScanState();
 
 	function resetScanState() {
-		return { ids: [], bytes: 0, estimatedBytes: 0, totalPosts: 0 };
+		return { ids: [], bytes: 0, estimatedBytes: 0, totalPosts: 0, format: selectedFormat() };
+	}
+
+	function selectedFormat() {
+		return document.querySelector( 'input[name="opti-pict-format"]:checked' )?.value || 'webp';
 	}
 
 	function request( action, data = {} ) {
@@ -108,7 +114,7 @@
 			let page = 1;
 			let totalPages = 1;
 			do {
-				const data = await request( 'opti_pict_scan', { page } );
+				const data = await request( 'opti_pict_scan', { page, format: scanState.format } );
 				totalPages = Math.max( 1, data.totalPages );
 				scanState.ids.push( ...data.ids );
 				scanState.bytes += data.bytes;
@@ -133,7 +139,7 @@
 		}
 
 		const saving = Math.max( 0, scanState.bytes - scanState.estimatedBytes );
-		document.getElementById( 'opti-pict-scan-summary' ).textContent = `${ scanState.ids.length } image(s) peuvent être traitée(s). Confirmez pour créer et utiliser les versions WebP.`;
+		document.getElementById( 'opti-pict-scan-summary' ).textContent = `${ scanState.ids.length } image(s) peuvent être traitée(s). Confirmez pour créer et utiliser les versions ${ scanState.format.toUpperCase() }.`;
 		document.getElementById( 'opti-pict-before' ).textContent = formatBytes( scanState.bytes );
 		document.getElementById( 'opti-pict-estimated-saving' ).textContent = `≈ ${ formatBytes( saving ) }`;
 		document.getElementById( 'opti-pict-estimated-time' ).textContent = `${ formatDuration( secondsFor( scanState.bytes ) ) } → ${ formatDuration( secondsFor( scanState.estimatedBytes ) ) }`;
@@ -149,9 +155,12 @@
 		for ( let index = 0; index < scanState.ids.length; index++ ) {
 			setProgress( config.strings.optimizeProgress, index, scanState.ids.length, `Image ${ index + 1 } sur ${ scanState.ids.length }` );
 			try {
-				const data = await request( 'opti_pict_optimize', { attachmentId: scanState.ids[ index ] } );
+				const data = await request( 'opti_pict_optimize', { attachmentId: scanState.ids[ index ], format: scanState.format } );
 				[ 'before', 'after', 'saved', 'converted', 'skipped' ].forEach( ( key ) => { totals[ key ] += Number( data[ key ] || 0 ); } );
-				if ( data.converted > 0 ) totals.optimizedIds.push( data.attachmentId );
+				if ( data.converted > 0 ) {
+					totals.optimizedIds.push( data.attachmentId );
+					if ( data.item ) upsertOptimizedItem( data.item );
+				}
 			} catch ( error ) {
 				totals.errors++;
 			}
@@ -183,7 +192,7 @@
 		document.getElementById( 'opti-pict-saved' ).textContent = formatBytes( totals.saved );
 		document.getElementById( 'opti-pict-percent' ).textContent = `${ new Intl.NumberFormat( 'fr-FR', { maximumFractionDigits: 1 } ).format( reduction ) } %`;
 		document.getElementById( 'opti-pict-time-saved' ).textContent = formatDuration( secondsFor( totals.saved ) );
-		document.getElementById( 'opti-pict-final-summary' ).textContent = `${ totals.converted } fichier(s) WebP créé(s) pour ${ scanState.ids.length - totals.errors } image(s).${ totals.errors ? ` ${ totals.errors } image(s) n’ont pas pu être traitée(s).` : '' }`;
+		document.getElementById( 'opti-pict-final-summary' ).textContent = `${ totals.converted } fichier(s) ${ scanState.format.toUpperCase() } créé(s) pour ${ scanState.ids.length - totals.errors } image(s).${ totals.errors ? ` ${ totals.errors } image(s) n’ont pas pu être traitée(s).` : '' }`;
 		setView( 'final' );
 		if ( totals.errors ) {
 			showError( `${ totals.errors } image(s) n’ont pas pu être traitée(s). Relancez une analyse pour réessayer.` );
@@ -197,6 +206,62 @@
 			elements.restore.dataset.ids = JSON.stringify( ids );
 			elements.restore.textContent = `Restaurer ${ ids.length } image${ ids.length > 1 ? 's' : '' }`;
 			elements.restoreCard.hidden = false;
+		}
+	}
+
+	function upsertOptimizedItem( item ) {
+		if ( ! elements.optimizedList ) return;
+		elements.optimizedList.querySelector( `[data-attachment-id="${ Number( item.id ) }"]` )?.remove();
+		const row = document.createElement( 'article' );
+		row.className = 'opti-pict-optimized-item';
+		row.dataset.attachmentId = String( item.id );
+		if ( item.thumbnail ) {
+			const image = document.createElement( 'img' );
+			image.src = item.thumbnail;
+			image.alt = '';
+			row.appendChild( image );
+		}
+		const identity = document.createElement( 'div' );
+		identity.className = 'opti-pict-optimized-item__identity';
+		identity.appendChild( Object.assign( document.createElement( 'strong' ), { textContent: item.title || item.filename } ) );
+		identity.appendChild( Object.assign( document.createElement( 'span' ), { textContent: `${ item.filename } · ${ item.format }` } ) );
+		row.appendChild( identity );
+		const gain = document.createElement( 'div' );
+		gain.className = 'opti-pict-optimized-item__gain';
+		gain.appendChild( Object.assign( document.createElement( 'strong' ), { textContent: `${ formatBytes( item.saved ) } (${ new Intl.NumberFormat( 'fr-FR', { maximumFractionDigits: 1 } ).format( item.percent ) } %)` } ) );
+		gain.appendChild( Object.assign( document.createElement( 'span' ), { textContent: `${ formatBytes( item.before ) } → ${ formatBytes( item.after ) }` } ) );
+		row.appendChild( gain );
+		const button = Object.assign( document.createElement( 'button' ), { type: 'button', className: 'button opti-pict-restore-one', textContent: 'Restaurer' } );
+		row.appendChild( button );
+		const status = document.createElement( 'p' );
+		status.className = 'opti-pict-optimized-item__status screen-reader-text';
+		status.setAttribute( 'role', 'status' );
+		status.setAttribute( 'aria-live', 'polite' );
+		row.appendChild( status );
+		elements.optimizedList.prepend( row );
+		elements.optimized.hidden = false;
+	}
+
+	async function restoreOne( row, button ) {
+		if ( ! window.confirm( config.strings.restoreOneConfirm ) ) return;
+		button.disabled = true;
+		row.setAttribute( 'aria-busy', 'true' );
+		try {
+			await request( 'opti_pict_restore', { attachmentId: row.dataset.attachmentId } );
+			const id = Number( row.dataset.attachmentId );
+			const ids = JSON.parse( elements.restore?.dataset.ids || '[]' ).filter( ( value ) => Number( value ) !== id );
+			if ( elements.restore ) {
+				elements.restore.dataset.ids = JSON.stringify( ids );
+				elements.restore.textContent = `Restaurer ${ ids.length } image${ ids.length > 1 ? 's' : '' }`;
+			}
+			if ( elements.restoreCard ) elements.restoreCard.hidden = ids.length === 0;
+			row.remove();
+			if ( ! elements.optimizedList.children.length ) elements.optimized.hidden = true;
+			elements.live.textContent = 'Image d’origine restaurée.';
+		} catch ( error ) {
+			showError( error.message );
+			button.disabled = false;
+			row.removeAttribute( 'aria-busy' );
 		}
 	}
 
@@ -220,6 +285,7 @@
 			setProgress( config.strings.restoreProgress, index, ids.length, `Image ${ index + 1 } sur ${ ids.length }` );
 			try {
 				await request( 'opti_pict_restore', { attachmentId: ids[ index ] } );
+				elements.optimizedList?.querySelector( `[data-attachment-id="${ Number( ids[ index ] ) }"]` )?.remove();
 			} catch ( error ) {
 				failedIds.push( ids[ index ] );
 			}
@@ -228,6 +294,7 @@
 		elements.restore.dataset.ids = JSON.stringify( failedIds );
 		elements.restore.textContent = `Restaurer ${ failedIds.length } image${ failedIds.length > 1 ? 's' : '' }`;
 		elements.restoreCard.hidden = failedIds.length === 0;
+		if ( elements.optimized && elements.optimizedList && ! elements.optimizedList.children.length ) elements.optimized.hidden = true;
 		setView( 'idle' );
 		elements.live.textContent = failedIds.length ? `Restauration terminée avec ${ failedIds.length } erreur(s).` : 'Les images d’origine ont été restaurées.';
 		if ( failedIds.length ) showError( `${ failedIds.length } image(s) n’ont pas pu être restaurée(s). Vous pouvez réessayer.` );
@@ -240,4 +307,8 @@
 	elements.newScan?.addEventListener( 'click', scan );
 	elements.optimize?.addEventListener( 'click', optimize );
 	elements.restore?.addEventListener( 'click', restore );
+	elements.optimizedList?.addEventListener( 'click', ( event ) => {
+		const button = event.target.closest( '.opti-pict-restore-one' );
+		if ( button ) restoreOne( button.closest( '.opti-pict-optimized-item' ), button );
+	} );
 }() );

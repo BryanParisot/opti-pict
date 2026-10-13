@@ -436,7 +436,8 @@ final class Opti_Pict {
 					'scanInProgress'   => __( 'Analyse de la médiathèque…', 'opti-pict' ),
 					'optimizeProgress' => __( 'Optimisation en cours…', 'opti-pict' ),
 					'restoreProgress'  => __( 'Restauration en cours…', 'opti-pict' ),
-					'restoreConfirm'   => __( 'Restaurer les images d’origine ? Les versions WebP créées par Opti Pict seront supprimées.', 'opti-pict' ),
+					'restoreConfirm'   => __( 'Restaurer les images d’origine ? Les versions optimisées créées par Opti Pict seront supprimées.', 'opti-pict' ),
+					'restoreOneConfirm' => __( 'Restaurer cette image dans son format d’origine ?', 'opti-pict' ),
 					'complete'         => __( 'Traitement terminé.', 'opti-pict' ),
 					'noImage'          => __( 'Aucune image JPEG ou PNG à optimiser.', 'opti-pict' ),
 				),
@@ -483,17 +484,18 @@ final class Opti_Pict {
 			}
 
 			$support      = $this->get_support_status();
-			$restore_ids  = $this->get_restore_ids();
-			$last_report  = get_option( self::LAST_REPORT_OPTION, array() );
-			$can_optimize = $support['webp'] && $support['uploads_writable'];
+			$restore_ids   = $this->get_restore_ids();
+			$restore_items = $this->get_restore_items( $restore_ids );
+			$last_report   = get_option( self::LAST_REPORT_OPTION, array() );
+			$can_optimize  = ( $support['webp'] || $support['avif'] ) && $support['uploads_writable'];
 			?>
 
 			<?php if ( ! $can_optimize ) : ?>
 				<div class="notice notice-error inline opti-pict__notice" role="alert">
 					<p>
 						<?php
-						if ( ! $support['webp'] ) {
-							esc_html_e( 'Ce serveur ne permet pas encore de créer des fichiers WebP. Activez WebP dans GD ou Imagick avant de lancer une optimisation.', 'opti-pict' );
+						if ( ! $support['webp'] && ! $support['avif'] ) {
+							esc_html_e( 'Ce serveur ne permet pas encore de créer des fichiers WebP ou AVIF. Activez l’un de ces formats dans GD ou Imagick avant de lancer une optimisation.', 'opti-pict' );
 						} else {
 							esc_html_e( 'Le dossier des téléversements n’est pas accessible en écriture.', 'opti-pict' );
 						}
@@ -518,6 +520,12 @@ final class Opti_Pict {
 							<li><?php esc_html_e( 'Originaux conservés pour une restauration sûre', 'opti-pict' ); ?></li>
 							<li><?php esc_html_e( 'Aucun fichier envoyé vers un service externe', 'opti-pict' ); ?></li>
 						</ul>
+						<fieldset class="opti-pict-format">
+							<legend><?php esc_html_e( 'Format de sortie', 'opti-pict' ); ?></legend>
+							<label><input type="radio" name="opti-pict-format" value="webp" <?php checked( $support['webp'] ); ?> <?php disabled( ! $support['webp'] ); ?>> <?php esc_html_e( 'WebP — compatible et léger', 'opti-pict' ); ?></label>
+							<label><input type="radio" name="opti-pict-format" value="avif" <?php checked( ! $support['webp'] && $support['avif'] ); ?> <?php disabled( ! $support['avif'] ); ?>> <?php esc_html_e( 'AVIF — compression renforcée', 'opti-pict' ); ?></label>
+							<?php if ( ! $support['avif'] ) : ?><p class="description"><?php esc_html_e( 'AVIF n’est pas disponible avec la bibliothèque d’images de ce serveur.', 'opti-pict' ); ?></p><?php endif; ?>
+						</fieldset>
 						<button type="button" class="button button-primary button-hero" id="opti-pict-scan" <?php disabled( ! $can_optimize ); ?>>
 							<?php esc_html_e( 'Lancer l’analyse', 'opti-pict' ); ?>
 						</button>
@@ -564,9 +572,21 @@ final class Opti_Pict {
 							<div><span><?php esc_html_e( 'Réduction réelle', 'opti-pict' ); ?></span><strong id="opti-pict-percent">—</strong></div>
 							<div><span><?php esc_html_e( 'Temps économisé', 'opti-pict' ); ?></span><strong id="opti-pict-time-saved">—</strong></div>
 						</div>
-						<p class="opti-pict-info"><?php esc_html_e( 'Sur un site en production, purgez ensuite le cache de page et le CDN pour que le HTML contenant les nouvelles URL WebP soit régénéré.', 'opti-pict' ); ?></p>
+						<p class="opti-pict-info"><?php esc_html_e( 'Sur un site en production, purgez ensuite le cache de page et le CDN pour que le HTML contenant les nouvelles URL soit régénéré.', 'opti-pict' ); ?></p>
 						<button type="button" class="button button-primary" id="opti-pict-new-scan"><?php esc_html_e( 'Analyser à nouveau', 'opti-pict' ); ?></button>
 					</div>
+
+					<section class="opti-pict-optimized" id="opti-pict-optimized" <?php echo empty( $restore_items ) ? 'hidden' : ''; ?>>
+						<div class="opti-pict-seo__results-head">
+							<h2><?php esc_html_e( 'Images optimisées', 'opti-pict' ); ?></h2>
+							<p><?php esc_html_e( 'Gain réel et restauration individuelle', 'opti-pict' ); ?></p>
+						</div>
+						<div class="opti-pict-optimized__list" id="opti-pict-optimized-list">
+							<?php foreach ( $restore_items as $item ) : ?>
+								<?php $this->render_restore_item( $item ); ?>
+							<?php endforeach; ?>
+						</div>
+					</section>
 
 					<div class="notice notice-error inline opti-pict__notice" id="opti-pict-error" role="alert" hidden><p></p></div>
 					<p class="screen-reader-text" id="opti-pict-live" aria-live="polite" aria-atomic="true"></p>
@@ -577,8 +597,9 @@ final class Opti_Pict {
 						<h2><?php esc_html_e( 'État du serveur', 'opti-pict' ); ?></h2>
 						<ul class="opti-pict-status">
 							<li><span><?php esc_html_e( 'Création WebP', 'opti-pict' ); ?></span><strong class="<?php echo $support['webp'] ? 'is-ok' : 'is-error'; ?>"><?php echo $support['webp'] ? esc_html__( 'Disponible', 'opti-pict' ) : esc_html__( 'Indisponible', 'opti-pict' ); ?></strong></li>
+							<li><span><?php esc_html_e( 'Création AVIF', 'opti-pict' ); ?></span><strong class="<?php echo $support['avif'] ? 'is-ok' : ''; ?>"><?php echo $support['avif'] ? esc_html__( 'Disponible', 'opti-pict' ) : esc_html__( 'Indisponible', 'opti-pict' ); ?></strong></li>
 							<li><span><?php esc_html_e( 'Dossier uploads', 'opti-pict' ); ?></span><strong class="<?php echo $support['uploads_writable'] ? 'is-ok' : 'is-error'; ?>"><?php echo $support['uploads_writable'] ? esc_html__( 'Accessible', 'opti-pict' ) : esc_html__( 'Bloqué', 'opti-pict' ); ?></strong></li>
-							<li><span><?php esc_html_e( 'Qualité WebP', 'opti-pict' ); ?></span><strong><?php echo esc_html( $this->get_quality() ); ?> %</strong></li>
+							<li><span><?php esc_html_e( 'Qualité de sortie', 'opti-pict' ); ?></span><strong><?php echo esc_html( $this->get_quality() ); ?> %</strong></li>
 						</ul>
 					</section>
 
@@ -621,6 +642,7 @@ final class Opti_Pict {
 
 		return array(
 			'webp'             => wp_image_editor_supports( array( 'mime_type' => 'image/webp' ) ),
+			'avif'             => wp_image_editor_supports( array( 'mime_type' => 'image/avif' ) ),
 			'uploads_writable' => empty( $uploads['error'] ) && is_dir( $uploads['basedir'] ) && wp_is_writable( $uploads['basedir'] ),
 		);
 	}
@@ -629,7 +651,8 @@ final class Opti_Pict {
 	 * Scan one page of attachments.
 	 */
 	public function ajax_scan() {
-		$this->verify_ajax_request();
+		$format = $this->get_requested_format();
+		$this->verify_ajax_request( true, $format );
 
 		// The nonce is verified by verify_ajax_request() immediately above.
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing
@@ -673,7 +696,7 @@ final class Opti_Pict {
 			foreach ( $files as $file ) {
 				$size   = filesize( $file['path'] );
 				$bytes += false === $size ? 0 : (int) $size;
-				$ratio  = 'image/png' === $file['mime'] ? 0.58 : 0.72;
+				$ratio  = 'avif' === $format ? ( 'image/png' === $file['mime'] ? 0.45 : 0.58 ) : ( 'image/png' === $file['mime'] ? 0.58 : 0.72 );
 				$after += (int) round( ( false === $size ? 0 : $size ) * $ratio );
 			}
 
@@ -692,6 +715,7 @@ final class Opti_Pict {
 				'page'           => $page,
 				'totalPages'     => (int) $query->max_num_pages,
 				'totalPosts'     => (int) $query->found_posts,
+				'format'         => $format,
 			)
 		);
 	}
@@ -700,7 +724,8 @@ final class Opti_Pict {
 	 * Optimize one attachment.
 	 */
 	public function ajax_optimize() {
-		$this->verify_ajax_request();
+		$format = $this->get_requested_format();
+		$this->verify_ajax_request( true, $format );
 
 		// The nonce is verified by verify_ajax_request() immediately above.
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing
@@ -709,7 +734,7 @@ final class Opti_Pict {
 			wp_send_json_error( array( 'message' => __( 'Image introuvable.', 'opti-pict' ) ), 404 );
 		}
 
-		$result = $this->optimize_attachment( $attachment_id );
+		$result = $this->optimize_attachment( $attachment_id, $format );
 		if ( is_wp_error( $result ) ) {
 			wp_send_json_error(
 				array(
@@ -774,9 +799,10 @@ final class Opti_Pict {
 	/**
 	 * Check permissions, nonce and server support.
 	 *
-	 * @param bool $require_support Whether WebP and writable uploads are required.
+	 * @param bool   $require_support Whether image encoding and writable uploads are required.
+	 * @param string $format          Requested output format.
 	 */
-	private function verify_ajax_request( $require_support = true ) {
+	private function verify_ajax_request( $require_support = true, $format = 'webp' ) {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( array( 'message' => __( 'Action non autorisée.', 'opti-pict' ) ), 403 );
 		}
@@ -785,26 +811,39 @@ final class Opti_Pict {
 
 		if ( $require_support ) {
 			$support = $this->get_support_status();
-			if ( ! $support['webp'] || ! $support['uploads_writable'] ) {
-				wp_send_json_error( array( 'message' => __( 'Le serveur ne peut pas créer de fichiers WebP dans le dossier des téléversements.', 'opti-pict' ) ), 500 );
+			if ( empty( $support[ $format ] ) || ! $support['uploads_writable'] ) {
+				wp_send_json_error( array( 'message' => __( 'Le serveur ne peut pas créer le format demandé dans le dossier des téléversements.', 'opti-pict' ) ), 500 );
 			}
 		}
 	}
 
 	/**
+	 * Read and strictly validate the requested output format.
+	 *
+	 * @return string
+	 */
+	private function get_requested_format() {
+		// The nonce is checked by the calling AJAX method before any action is performed.
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing
+		$format = isset( $_POST['format'] ) ? sanitize_key( wp_unslash( $_POST['format'] ) ) : 'webp';
+		return in_array( $format, array( 'webp', 'avif' ), true ) ? $format : 'webp';
+	}
+
+	/**
 	 * Optimize an attachment and its registered sizes.
 	 *
-	 * @param int $attachment_id Attachment ID.
-	 * @return array<string,int>|WP_Error
+	 * @param int    $attachment_id Attachment ID.
+	 * @param string $format        Output format.
+	 * @return array<string,mixed>|WP_Error
 	 */
-	private function optimize_attachment( $attachment_id ) {
+	private function optimize_attachment( $attachment_id, $format ) {
 		$lock = $this->acquire_attachment_lock( $attachment_id );
 		if ( is_wp_error( $lock ) ) {
 			return $lock;
 		}
 
 		try {
-			return $this->optimize_attachment_locked( $attachment_id );
+			return $this->optimize_attachment_locked( $attachment_id, $format );
 		} finally {
 			$this->release_attachment_lock( $attachment_id );
 		}
@@ -813,10 +852,11 @@ final class Opti_Pict {
 	/**
 	 * Optimize an attachment while its per-attachment lock is held.
 	 *
-	 * @param int $attachment_id Attachment ID.
-	 * @return array<string,int>|WP_Error
+	 * @param int    $attachment_id Attachment ID.
+	 * @param string $format        Output format.
+	 * @return array<string,mixed>|WP_Error
 	 */
-	private function optimize_attachment_locked( $attachment_id ) {
+	private function optimize_attachment_locked( $attachment_id, $format ) {
 		if ( get_post_meta( $attachment_id, self::PROCESSED_META, true ) ) {
 			return array(
 				'attachmentId' => $attachment_id,
@@ -847,7 +887,8 @@ final class Opti_Pict {
 		$after         = 0;
 		$converted     = 0;
 		$skipped       = 0;
-		$full_webp     = '';
+		$full_output   = '';
+		$output_mime   = 'avif' === $format ? 'image/avif' : 'image/webp';
 
 		foreach ( $files as $file ) {
 			$source_size = filesize( $file['path'] );
@@ -857,7 +898,7 @@ final class Opti_Pict {
 			}
 
 			$before     += (int) $source_size;
-			$destination = $this->get_destination_path( $file['path'] );
+			$destination = $this->get_destination_path( $file['path'], $format );
 			$editor      = wp_get_image_editor( $file['path'] );
 
 			if ( is_wp_error( $editor ) ) {
@@ -867,8 +908,8 @@ final class Opti_Pict {
 			}
 
 			$editor->set_quality( $this->get_quality() );
-			$saved_file = $editor->save( $destination, 'image/webp' );
-			if ( is_wp_error( $saved_file ) || empty( $saved_file['path'] ) || ! $this->is_safe_generated_file( $saved_file['path'] ) ) {
+			$saved_file = $editor->save( $destination, $output_mime );
+			if ( is_wp_error( $saved_file ) || empty( $saved_file['path'] ) || ! $this->is_safe_generated_file( $saved_file['path'], $output_mime ) ) {
 				++$skipped;
 				$after += (int) $source_size;
 				continue;
@@ -882,8 +923,8 @@ final class Opti_Pict {
 				continue;
 			}
 
-			$webp_size = filesize( $saved_file['path'] );
-			if ( false === $webp_size || $webp_size >= $source_size ) {
+			$output_size = filesize( $saved_file['path'] );
+			if ( false === $output_size || $output_size >= $source_size ) {
 				wp_delete_file( $saved_file['path'] );
 				++$skipped;
 				$after += (int) $source_size;
@@ -891,17 +932,17 @@ final class Opti_Pict {
 			}
 
 			++$converted;
-			$after                += (int) $webp_size;
+			$after                += (int) $output_size;
 			$backup['generated'][] = $relative_output;
 
 			if ( 'full' === $file['key'] ) {
-				$full_webp                = $saved_file['path'];
+				$full_output              = $saved_file['path'];
 				$new_metadata['file']     = $relative_output;
-				$new_metadata['filesize'] = (int) $webp_size;
+				$new_metadata['filesize'] = (int) $output_size;
 			} elseif ( isset( $new_metadata['sizes'][ $file['key'] ] ) ) {
 				$new_metadata['sizes'][ $file['key'] ]['file']      = wp_basename( $saved_file['path'] );
-				$new_metadata['sizes'][ $file['key'] ]['mime-type'] = 'image/webp';
-				$new_metadata['sizes'][ $file['key'] ]['filesize']  = (int) $webp_size;
+				$new_metadata['sizes'][ $file['key'] ]['mime-type'] = $output_mime;
+				$new_metadata['sizes'][ $file['key'] ]['filesize']  = (int) $output_size;
 			}
 		}
 
@@ -917,6 +958,11 @@ final class Opti_Pict {
 			);
 		}
 
+		$backup['before'] = $before;
+		$backup['after']  = $after;
+		$backup['saved']  = max( 0, $before - $after );
+		$backup['format'] = $format;
+
 		if ( ! add_post_meta( $attachment_id, self::BACKUP_META, $backup, true ) ) {
 			foreach ( $backup['generated'] as $relative_path ) {
 				$this->delete_generated_file( $relative_path );
@@ -925,13 +971,13 @@ final class Opti_Pict {
 		}
 
 		$update_failed = false;
-		if ( $full_webp ) {
-			update_attached_file( $attachment_id, $full_webp );
+		if ( $full_output ) {
+			update_attached_file( $attachment_id, $full_output );
 
 			$post_result = wp_update_post(
 				array(
 					'ID'             => $attachment_id,
-					'post_mime_type' => 'image/webp',
+					'post_mime_type' => $output_mime,
 				),
 				true
 			);
@@ -946,10 +992,10 @@ final class Opti_Pict {
 		if ( $current_metadata != $new_metadata ) { // phpcs:ignore Universal.Operators.StrictComparisons.LooseNotEqual -- Metadata filters may normalize scalar types.
 			$update_failed = true;
 		}
-		if ( $full_webp && get_post_meta( $attachment_id, '_wp_attached_file', true ) !== $new_metadata['file'] ) {
+		if ( $full_output && get_post_meta( $attachment_id, '_wp_attached_file', true ) !== $new_metadata['file'] ) {
 			$update_failed = true;
 		}
-		if ( $full_webp && 'image/webp' !== get_post_mime_type( $attachment_id ) ) {
+		if ( $full_output && $output_mime !== get_post_mime_type( $attachment_id ) ) {
 			$update_failed = true;
 		}
 
@@ -971,6 +1017,8 @@ final class Opti_Pict {
 			'saved'        => max( 0, $before - $after ),
 			'converted'    => $converted,
 			'skipped'      => $skipped,
+			'format'       => $format,
+			'item'         => $this->get_restore_item( $attachment_id ),
 		);
 	}
 
@@ -1035,7 +1083,7 @@ final class Opti_Pict {
 			! $metadata_matches ||
 			sanitize_mime_type( $backup['post_mime'] ) !== get_post_mime_type( $attachment_id )
 		) {
-			return new WP_Error( 'opti_pict_restore_unconfirmed', __( 'WordPress n’a pas pu confirmer la restauration. Aucun fichier WebP n’a été supprimé.', 'opti-pict' ) );
+			return new WP_Error( 'opti_pict_restore_unconfirmed', __( 'WordPress n’a pas pu confirmer la restauration. Aucun fichier optimisé n’a été supprimé.', 'opti-pict' ) );
 		}
 
 		$deleted = 0;
@@ -1164,15 +1212,17 @@ final class Opti_Pict {
 	}
 
 	/**
-	 * Build a deterministic WebP filename.
+	 * Build a deterministic optimized filename.
 	 *
 	 * @param string $source Source path.
+	 * @param string $format Output extension.
 	 * @return string
 	 */
-	private function get_destination_path( $source ) {
-		$info     = pathinfo( $source );
-		$filename = sanitize_file_name( $info['filename'] . '-opti-pict.webp' );
-		$unique   = wp_unique_filename( $info['dirname'], $filename );
+	private function get_destination_path( $source, $format ) {
+		$info      = pathinfo( $source );
+		$extension = 'avif' === $format ? 'avif' : 'webp';
+		$filename  = sanitize_file_name( $info['filename'] . '-opti-pict.' . $extension );
+		$unique    = wp_unique_filename( $info['dirname'], $filename );
 		return trailingslashit( $info['dirname'] ) . $unique;
 	}
 
@@ -1214,14 +1264,14 @@ final class Opti_Pict {
 	}
 
 	/**
-	 * Delete a generated WebP after strict path and filename validation.
+	 * Delete a generated optimized image after strict path and filename validation.
 	 *
 	 * @param string $relative_path Relative uploads path.
 	 * @return bool
 	 */
 	private function delete_generated_file( $relative_path ) {
 		$path = $this->relative_to_absolute_upload_path( $relative_path );
-		if ( ! $path || ! preg_match( '/-opti-pict(?:-\d+)?\.webp$/i', $path ) || ! $this->is_safe_generated_file( $path ) ) {
+		if ( ! $path || ! preg_match( '/-opti-pict(?:-\d+)?\.(?:webp|avif)$/i', $path ) || ! $this->is_safe_generated_file( $path ) ) {
 			return false;
 		}
 
@@ -1235,12 +1285,13 @@ final class Opti_Pict {
 	}
 
 	/**
-	 * Ensure an output is a regular WebP file inside uploads.
+	 * Ensure an output is a regular optimized file inside uploads.
 	 *
-	 * @param string $path Absolute path.
+	 * @param string $path          Absolute path.
+	 * @param string $expected_mime Optional expected MIME type.
 	 * @return bool
 	 */
-	private function is_safe_generated_file( $path ) {
+	private function is_safe_generated_file( $path, $expected_mime = '' ) {
 		if ( ! is_string( $path ) || ! is_file( $path ) || ! is_readable( $path ) || is_link( $path ) ) {
 			return false;
 		}
@@ -1252,7 +1303,12 @@ final class Opti_Pict {
 			return false;
 		}
 
-		return 'image/webp' === wp_get_image_mime( $real_path );
+		$mime = wp_get_image_mime( $real_path );
+		if ( $expected_mime ) {
+			return $expected_mime === $mime;
+		}
+
+		return in_array( $mime, array( 'image/webp', 'image/avif' ), true );
 	}
 
 	/**
@@ -1277,13 +1333,81 @@ final class Opti_Pict {
 	}
 
 	/**
-	 * Filterable WebP quality.
+	 * Build display records for optimized attachments.
+	 *
+	 * @param int[] $attachment_ids Attachment IDs.
+	 * @return array<int,array<string,mixed>>
+	 */
+	private function get_restore_items( $attachment_ids ) {
+		$items = array();
+		foreach ( $attachment_ids as $attachment_id ) {
+			$item = $this->get_restore_item( $attachment_id );
+			if ( $item ) {
+				$items[] = $item;
+			}
+		}
+		return $items;
+	}
+
+	/**
+	 * Return the gain and identity of one optimized image.
+	 *
+	 * @param int $attachment_id Attachment ID.
+	 * @return array<string,mixed>|false
+	 */
+	private function get_restore_item( $attachment_id ) {
+		$backup = get_post_meta( $attachment_id, self::BACKUP_META, true );
+		if ( ! is_array( $backup ) ) {
+			return false;
+		}
+
+		$before = absint( $backup['before'] ?? 0 );
+		$after  = absint( $backup['after'] ?? 0 );
+		$saved  = absint( $backup['saved'] ?? max( 0, $before - $after ) );
+		return array(
+			'id'        => absint( $attachment_id ),
+			'title'     => get_the_title( $attachment_id ),
+			'thumbnail' => wp_get_attachment_image_url( $attachment_id, 'thumbnail' ),
+			'filename'  => wp_basename( (string) get_attached_file( $attachment_id ) ),
+			'before'    => $before,
+			'after'     => $after,
+			'saved'     => $saved,
+			'percent'   => $before > 0 ? round( ( $saved / $before ) * 100, 1 ) : 0,
+			'format'    => strtoupper( sanitize_key( $backup['format'] ?? 'webp' ) ),
+		);
+	}
+
+	/**
+	 * Render one restorable image row.
+	 *
+	 * @param array<string,mixed> $item Image record.
+	 */
+	private function render_restore_item( $item ) {
+		?>
+		<article class="opti-pict-optimized-item" data-attachment-id="<?php echo esc_attr( $item['id'] ); ?>">
+			<?php if ( $item['thumbnail'] ) : ?><img src="<?php echo esc_url( $item['thumbnail'] ); ?>" alt=""><?php endif; ?>
+			<div class="opti-pict-optimized-item__identity">
+				<strong><?php echo esc_html( $item['title'] ?: $item['filename'] ); ?></strong>
+				<span><?php echo esc_html( $item['filename'] ); ?> · <?php echo esc_html( $item['format'] ); ?></span>
+			</div>
+			<div class="opti-pict-optimized-item__gain">
+				<strong><?php echo $item['saved'] ? esc_html( size_format( $item['saved'], 1 ) . ' (' . number_format_i18n( $item['percent'], 1 ) . ' %)' ) : esc_html__( 'Gain non mesuré', 'opti-pict' ); ?></strong>
+				<span><?php echo $item['before'] && $item['after'] ? esc_html( size_format( $item['before'], 1 ) . ' → ' . size_format( $item['after'], 1 ) ) : esc_html__( 'Optimisée avec une version antérieure', 'opti-pict' ); ?></span>
+			</div>
+			<button type="button" class="button opti-pict-restore-one"><?php esc_html_e( 'Restaurer', 'opti-pict' ); ?></button>
+			<p class="opti-pict-optimized-item__status screen-reader-text" role="status" aria-live="polite"></p>
+		</article>
+		<?php
+	}
+
+	/**
+	 * Filterable output quality.
 	 *
 	 * @return int
 	 */
 	private function get_quality() {
 		/**
-		 * Filters the WebP quality used by Opti Pict.
+		 * Filters the image quality used by Opti Pict.
 		 *
 		 * @param int $quality Quality from 1 to 100.
 		 */

@@ -1,15 +1,15 @@
 # Opti Pict
 
-Opti Pict est une extension WordPress qui convertit localement les images JPEG et PNG en WebP, mesure le poids économisé et aide à améliorer les textes alternatifs et métadonnées des images.
+Opti Pict est une extension WordPress qui convertit localement les images JPEG et PNG en WebP ou AVIF, mesure le poids économisé et aide à améliorer les textes alternatifs et métadonnées des images.
 
 ## Fonctionnalités
 
 - analyse de la médiathèque avant toute modification ;
-- conversion WebP locale avec conservation des originaux ;
-- mesure du poids et du temps de transfert économisés ;
-- restauration des fichiers et métadonnées précédents ;
-- remplacement à l’affichage des anciennes URL JPEG/PNG par les URL WebP dans les balises Image du document public, y compris les en-têtes, pieds de page, widgets et constructeurs compatibles ;
-- propositions facultatives de textes alternatifs, titres et noms conseillés avec l’API OpenAI, fondées sur les pages où chaque image est réellement utilisée ;
+- conversion WebP ou AVIF locale selon les capacités du serveur, avec conservation des originaux ;
+- mesure globale et individuelle du poids économisé ;
+- restauration globale ou individuelle des fichiers et métadonnées précédents ;
+- remplacement à l’affichage des anciennes URL JPEG/PNG par les URL optimisées dans les balises Image du document public, y compris les en-têtes, pieds de page, widgets et constructeurs compatibles ;
+- propositions facultatives de textes alternatifs, titres et noms conseillés avec l’API OpenAI, fondées sur les pages où chaque image est réellement utilisée et sur un contexte éditorial facultatif ;
 - validation humaine obligatoire avant l’application d’une proposition IA.
 
 ## Installation
@@ -18,9 +18,9 @@ Opti Pict est une extension WordPress qui convertit localement les images JPEG e
 2. Activez **Opti Pict** dans WordPress.
 3. Ouvrez **Médias → Opti Pict**.
 
-WordPress 6.4 ou plus récent et PHP 7.4 ou plus récent sont requis. La création WebP doit être disponible dans GD ou Imagick.
+WordPress 6.4 ou plus récent et PHP 7.4 ou plus récent sont requis. La création WebP doit être disponible dans GD ou Imagick. AVIF est proposé uniquement lorsque le serveur sait l’encoder.
 
-Après une optimisation en production, purgez le cache de page et le CDN afin que les pages soient régénérées avec les URL WebP.
+Après une optimisation en production, purgez le cache de page et le CDN afin que les pages soient régénérées avec les URL optimisées.
 
 ## Configuration de l’IA
 
@@ -38,7 +38,7 @@ Ne commitez jamais de clé réelle dans ce dépôt. Si une clé a été publiée
 
 ## Données envoyées
 
-La conversion WebP reste locale. L’API OpenAI est appelée uniquement lorsqu’un administrateur demande explicitement une proposition. Une image réduite et un contexte éditorial limité sont alors transmis directement à OpenAI avec `store: false`. Consultez [readme.txt](readme.txt) pour la déclaration complète du service externe.
+La conversion WebP/AVIF reste locale. L’API OpenAI est appelée uniquement lorsqu’un administrateur demande explicitement une proposition. Une image réduite et un contexte éditorial limité sont alors transmis directement à OpenAI avec `store: false`. Consultez [readme.txt](readme.txt) pour la déclaration complète du service externe.
 
 ## Sécurité
 

@@ -1,14 +1,14 @@
 === Opti Pict ===
 Contributors: optipict
-Tags: images, webp, performance, media, seo
+Tags: images, webp, avif, performance, media
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.4.0
+Stable tag: 0.5.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Convertit localement les JPEG et PNG de la médiathèque en WebP et affiche le gain réellement obtenu.
+Convertit localement les JPEG et PNG en WebP ou AVIF et affiche le gain réellement obtenu pour chaque image.
 
 == Description ==
 
@@ -16,9 +16,9 @@ Opti Pict propose un parcours simple :
 
 1. analyser les images sans les modifier ;
 2. confirmer explicitement la conversion ;
-3. consulter le poids et le temps de transfert économisés.
+3. consulter le poids économisé globalement et pour chaque image.
 
-Les originaux ne sont jamais supprimés. Une restauration est disponible depuis l’écran Média > Opti Pict. La conversion WebP est entièrement locale et n’envoie aucun fichier à un service externe.
+Les originaux ne sont jamais supprimés. Une restauration globale ou individuelle est disponible depuis l’écran Média > Opti Pict. La conversion WebP ou AVIF est entièrement locale et n’envoie aucun fichier à un service externe. AVIF est proposé uniquement lorsque la bibliothèque d’images du serveur sait l’encoder.
 
 Les anciennes URLs JPEG/PNG des balises Image sont adaptées au moment de l’affichage dans le document HTML public, y compris dans les en-têtes, pieds de page, widgets et constructeurs de pages compatibles, sans modifier le contenu enregistré. Après une mise à jour en production, le cache de page et le CDN doivent être purgés afin de régénérer le HTML.
 
@@ -30,7 +30,7 @@ L’utilisation de l’IA est facultative. Elle nécessite une clé API et une f
 
 Le module facultatif Référencement communique avec l’API OpenAI uniquement lorsqu’un administrateur clique sur « Proposer avec l’IA ».
 
-Pour produire la proposition, Opti Pict transmet une version réduite de l’image, le nom et la langue du site, le nom du fichier, les métadonnées actuelles et de courts passages centrés sur ses utilisations dans les contenus publiés. Les références enregistrées par certains constructeurs de pages peuvent également être examinées. Ces données sont envoyées directement depuis le site WordPress vers https://api.openai.com/v1/responses. Elles ne transitent pas par un serveur appartenant à Opti Pict.
+Pour produire la proposition, Opti Pict transmet une version réduite de l’image, le nom et la langue du site, le nom du fichier, les métadonnées actuelles, le contexte éditorial facultatif saisi par l’administrateur et de courts passages centrés sur ses utilisations dans les contenus publiés. Les références enregistrées par certains constructeurs de pages peuvent également être examinées. Ces données sont envoyées directement depuis le site WordPress vers https://api.openai.com/v1/responses. Elles ne transitent pas par un serveur appartenant à Opti Pict.
 
 Le stockage applicatif de la réponse est demandé avec `store: false`. Le traitement reste soumis aux règles d’OpenAI :
 
@@ -51,6 +51,12 @@ Ne placez jamais une vraie clé API dans le code de l’extension, dans un dép�
 3. Lancez l’analyse puis confirmez l’optimisation.
 
 == Changelog ==
+
+= 0.5.0 =
+* Ajout de la conversion AVIF lorsque le serveur la prend en charge.
+* Affichage du gain réel pour chaque image optimisée.
+* Restauration individuelle directement depuis la liste des images.
+* Ajout d’un contexte éditorial facultatif pour améliorer les propositions de textes alternatifs.
 
 = 0.4.0 =
 * Amélioration du contexte IA avec des passages centrés sur l’utilisation réelle de chaque image.

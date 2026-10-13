@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name:       Opti Pict
- * Description:       Analyse la médiathèque, crée des versions WebP plus légères et mesure le gain obtenu.
- * Version:           0.4.0
+ * Description:       Analyse la médiathèque, crée des versions WebP ou AVIF plus légères et mesure le gain obtenu.
+ * Version:           0.5.0
  * Requires at least: 6.4
  * Requires PHP:      7.4
  * Author:            Opti Pict
@@ -18,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'OPTI_PICT_VERSION', '0.4.0' );
+define( 'OPTI_PICT_VERSION', '0.5.0' );
 define( 'OPTI_PICT_FILE', __FILE__ );
 define( 'OPTI_PICT_DIR', plugin_dir_path( __FILE__ ) );
 define( 'OPTI_PICT_URL', plugin_dir_url( __FILE__ ) );

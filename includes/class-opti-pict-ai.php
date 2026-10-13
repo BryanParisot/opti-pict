@@ -251,7 +251,7 @@ final class Opti_Pict_AI {
 		$args = array(
 			'post_type'              => 'attachment',
 			'post_status'            => 'inherit',
-			'post_mime_type'         => array( 'image/jpeg', 'image/png', 'image/webp' ),
+			'post_mime_type'         => array( 'image/jpeg', 'image/png', 'image/webp', 'image/avif' ),
 			'posts_per_page'         => self::BATCH_SIZE,
 			'paged'                  => $page,
 			'orderby'                => 'ID',
@@ -324,6 +324,12 @@ final class Opti_Pict_AI {
 		}
 
 		$context    = $this->get_attachment_context( $attachment_id );
+		// The nonce is verified immediately above.
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing
+		$editorial_context = isset( $_POST['editorialContext'] ) ? sanitize_textarea_field( wp_unslash( $_POST['editorialContext'] ) ) : '';
+		if ( '' !== $editorial_context ) {
+			$context .= "\nContexte éditorial ajouté par l’administrateur (indication à vérifier avec l’image) : " . $this->limit_text( $editorial_context, 800 );
+		}
 		$suggestion = $this->request_suggestion( $api_key, $image_input, $context );
 		if ( is_wp_error( $suggestion ) ) {
 			wp_send_json_error( array( 'message' => $suggestion->get_error_message() ), 502 );
@@ -472,7 +478,7 @@ final class Opti_Pict_AI {
 			if ( $original_filename !== $filename ) {
 				$context_filename = $original_filename;
 				$needles[]        = $original_filename;
-				$parts[]          = 'Nom du fichier avant optimisation WebP : ' . $this->plain_excerpt( $original_filename, 180 );
+				$parts[]          = 'Nom du fichier avant optimisation : ' . $this->plain_excerpt( $original_filename, 180 );
 			}
 		}
 
@@ -592,6 +598,17 @@ final class Opti_Pict_AI {
 
 		$path     = $attached;
 		$metadata = wp_get_attachment_metadata( $attachment_id );
+		if ( 'image/avif' === wp_get_image_mime( $attached ) ) {
+			$backup  = get_post_meta( $attachment_id, '_opti_pict_backup', true );
+			$uploads = wp_upload_dir();
+			if ( is_array( $backup ) && ! empty( $backup['attached_file'] ) ) {
+				$original = trailingslashit( $uploads['basedir'] ) . ltrim( $backup['attached_file'], '/\\' );
+				if ( $this->is_safe_upload_file( $original ) ) {
+					$path     = $original;
+					$metadata = false;
+				}
+			}
+		}
 		if ( is_array( $metadata ) && ! empty( $metadata['sizes'] ) ) {
 			foreach ( array( 'medium_large', 'large', 'medium' ) as $size_name ) {
 				if ( ! empty( $metadata['sizes'][ $size_name ]['file'] ) ) {
@@ -1091,7 +1108,7 @@ final class Opti_Pict_AI {
 	 * @return bool
 	 */
 	private function is_supported_attachment( $attachment_id ) {
-		return $attachment_id > 0 && 'attachment' === get_post_type( $attachment_id ) && in_array( get_post_mime_type( $attachment_id ), array( 'image/jpeg', 'image/png', 'image/webp' ), true );
+		return $attachment_id > 0 && 'attachment' === get_post_type( $attachment_id ) && in_array( get_post_mime_type( $attachment_id ), array( 'image/jpeg', 'image/png', 'image/webp', 'image/avif' ), true );
 	}
 
 	/**

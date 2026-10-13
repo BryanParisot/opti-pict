@@ -237,6 +237,89 @@
 	margin-top: 26px;
 }
 
+.opti-pict-format {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px 20px;
+	margin: 0 0 24px;
+	padding: 16px;
+	border: 1px solid var(--op-line);
+	border-radius: 10px;
+	background: var(--op-soft);
+}
+
+.opti-pict-format legend {
+	padding: 0 5px;
+	font-weight: 650;
+}
+
+.opti-pict-format label {
+	font-weight: 500;
+}
+
+.opti-pict-format .description {
+	width: 100%;
+	margin: 0;
+}
+
+.opti-pict-optimized {
+	margin-top: 34px;
+	padding-top: 8px;
+	border-top: 1px solid var(--op-line);
+}
+
+.opti-pict-optimized__list {
+	display: grid;
+	gap: 10px;
+}
+
+.opti-pict-optimized-item {
+	display: grid;
+	grid-template-columns: 52px minmax(120px, 1fr) minmax(150px, auto) auto;
+	gap: 12px;
+	align-items: center;
+	padding: 12px;
+	border: 1px solid var(--op-line);
+	border-radius: 10px;
+	background: #fff;
+}
+
+.opti-pict-optimized-item[aria-busy="true"] {
+	opacity: .65;
+}
+
+.opti-pict-optimized-item img {
+	width: 52px;
+	height: 52px;
+	border-radius: 7px;
+	background: var(--op-soft);
+	object-fit: cover;
+}
+
+.opti-pict-optimized-item__identity,
+.opti-pict-optimized-item__gain {
+	display: flex;
+	min-width: 0;
+	flex-direction: column;
+	gap: 3px;
+}
+
+.opti-pict-optimized-item__identity strong,
+.opti-pict-optimized-item__identity span {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.opti-pict-optimized-item span {
+	color: var(--op-muted);
+	font-size: 12px;
+}
+
+.opti-pict-optimized-item__gain strong {
+	color: var(--op-accent);
+}
+
 .opti-pict-success {
 	display: flex;
 	gap: 14px;
@@ -425,6 +508,16 @@
 	margin-top: 12px;
 }
 
+.opti-pict-seo__context {
+	margin-top: 12px;
+}
+
+.opti-pict-seo__context textarea {
+	box-sizing: border-box;
+	width: 100%;
+	resize: vertical;
+}
+
 .opti-pict-seo__decorative {
 	display: block;
 	margin-top: 12px;
@@ -520,6 +613,16 @@
 	.opti-pict-seo-item__media img {
 		width: 72px;
 		height: 72px;
+	}
+
+	.opti-pict-optimized-item {
+		grid-template-columns: 52px minmax(0, 1fr);
+	}
+
+	.opti-pict-optimized-item__gain,
+	.opti-pict-optimized-item .button {
+		grid-column: 2;
+		justify-self: start;
 	}
 }
 

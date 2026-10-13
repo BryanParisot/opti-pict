@@ -192,6 +192,16 @@
 		const slug = createField( 'Nom conseillé (sans extension)', 'opti-pict-seo__slug', item.slug, 80 );
 		editor.appendChild( alt.wrapper );
 
+		const contextLabel = createElement( 'label', 'opti-pict-seo__field opti-pict-seo__context' );
+		contextLabel.appendChild( createElement( 'span', '', 'Contexte éditorial facultatif' ) );
+		const editorialContext = document.createElement( 'textarea' );
+		editorialContext.className = 'opti-pict-seo__context-input';
+		editorialContext.rows = 2;
+		editorialContext.maxLength = 800;
+		editorialContext.placeholder = 'Ex. : salle privatisable pour des séminaires à Lyon (uniquement si cela concerne bien cette image)';
+		contextLabel.appendChild( editorialContext );
+		editor.appendChild( contextLabel );
+
 		const columns = createElement( 'div', 'opti-pict-seo__fields-row' );
 		columns.appendChild( title.wrapper );
 		columns.appendChild( slug.wrapper );
@@ -261,7 +271,10 @@
 		hideError();
 
 		try {
-			const data = await request( 'opti_pict_seo_generate', { attachmentId: card.dataset.attachmentId } );
+			const data = await request( 'opti_pict_seo_generate', {
+				attachmentId: card.dataset.attachmentId,
+				editorialContext: card.querySelector( '.opti-pict-seo__context-input' ).value
+			} );
 			const suggestion = data.suggestion;
 			const altInput = card.querySelector( '.opti-pict-seo__alt' );
 			if ( suggestion.decorative ) altInput.dataset.previousValue = altInput.value;
