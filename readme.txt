@@ -4,7 +4,7 @@ Tags: images, webp, performance, media, seo
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.3.0
+Stable tag: 0.4.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -22,7 +22,7 @@ Les originaux ne sont jamais supprimés. Une restauration est disponible depuis 
 
 Les anciennes URLs JPEG/PNG des balises Image sont adaptées au moment de l’affichage dans le document HTML public, y compris dans les en-têtes, pieds de page, widgets et constructeurs de pages compatibles, sans modifier le contenu enregistré. Après une mise à jour en production, le cache de page et le CDN doivent être purgés afin de régénérer le HTML.
 
-Le module Référencement peut utiliser l’API OpenAI pour proposer un texte alternatif, un titre de média et un identifiant lisible à partir de l’image et de son contexte sur le site. Chaque proposition doit être validée avant application.
+Le module Référencement peut utiliser l’API OpenAI pour proposer un texte alternatif, un titre de média et un nom lisible à partir de l’image et des pages où elle est réellement utilisée. Le contexte général du site fournit du vocabulaire, mais n’est jamais considéré comme une preuve qu’une prestation concerne une photo. Chaque proposition doit être validée avant application.
 
 L’utilisation de l’IA est facultative. Elle nécessite une clé API et une facturation OpenAI API distinctes. Aucune clé commune n’est incluse dans l’extension.
 
@@ -30,7 +30,7 @@ L’utilisation de l’IA est facultative. Elle nécessite une clé API et une f
 
 Le module facultatif Référencement communique avec l’API OpenAI uniquement lorsqu’un administrateur clique sur « Proposer avec l’IA ».
 
-Pour produire la proposition, Opti Pict transmet une version réduite de l’image, le nom et la langue du site, le nom du fichier, les métadonnées actuelles et de courts extraits des contenus publiés où l’image est utilisée. Ces données sont envoyées directement depuis le site WordPress vers https://api.openai.com/v1/responses. Elles ne transitent pas par un serveur appartenant à Opti Pict.
+Pour produire la proposition, Opti Pict transmet une version réduite de l’image, le nom et la langue du site, le nom du fichier, les métadonnées actuelles et de courts passages centrés sur ses utilisations dans les contenus publiés. Les références enregistrées par certains constructeurs de pages peuvent également être examinées. Ces données sont envoyées directement depuis le site WordPress vers https://api.openai.com/v1/responses. Elles ne transitent pas par un serveur appartenant à Opti Pict.
 
 Le stockage applicatif de la réponse est demandé avec `store: false`. Le traitement reste soumis aux règles d’OpenAI :
 
@@ -51,6 +51,11 @@ Ne placez jamais une vraie clé API dans le code de l’extension, dans un dép�
 3. Lancez l’analyse puis confirmez l’optimisation.
 
 == Changelog ==
+
+= 0.4.0 =
+* Amélioration du contexte IA avec des passages centrés sur l’utilisation réelle de chaque image.
+* Détection complémentaire des références enregistrées par les constructeurs de pages.
+* Protection renforcée contre l’ajout de mots-clés commerciaux non confirmés par le contenu.
 
 = 0.3.0 =
 * Meilleure substitution des anciennes URLs par les fichiers WebP dans les contenus rendus, widgets et constructeurs de pages.

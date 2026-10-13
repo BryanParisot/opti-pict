@@ -189,7 +189,7 @@
 		const editor = createElement( 'div', 'opti-pict-seo-item__editor' );
 		const alt = createField( 'Texte alternatif', 'opti-pict-seo__alt', item.altText, config.maxAltLength );
 		const title = createField( 'Titre du média', 'opti-pict-seo__title', item.mediaTitle, 80 );
-		const slug = createField( 'Identifiant SEO', 'opti-pict-seo__slug', item.slug, 80 );
+		const slug = createField( 'Nom conseillé (sans extension)', 'opti-pict-seo__slug', item.slug, 80 );
 		editor.appendChild( alt.wrapper );
 
 		const columns = createElement( 'div', 'opti-pict-seo__fields-row' );
