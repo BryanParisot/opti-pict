@@ -9,7 +9,7 @@ Opti Pict est une extension WordPress qui convertit localement les images JPEG e
 - mesure globale et individuelle du poids économisé ;
 - restauration globale ou individuelle des fichiers et métadonnées précédents ;
 - remplacement à l’affichage des anciennes URL JPEG/PNG par les URL optimisées dans les balises Image du document public, y compris les en-têtes, pieds de page, widgets et constructeurs compatibles ;
-- propositions facultatives de textes alternatifs, titres et noms conseillés avec l’API OpenAI, fondées sur les pages où chaque image est réellement utilisée et sur un contexte éditorial facultatif ;
+- propositions facultatives de textes alternatifs, titres et slugs de page média avec l’API OpenAI, fondées sur les pages où chaque image est réellement utilisée et sur un contexte éditorial facultatif ;
 - validation humaine obligatoire avant l’application d’une proposition IA.
 
 ## Installation
