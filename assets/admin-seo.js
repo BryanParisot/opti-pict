@@ -157,7 +157,7 @@
 		return element;
 	}
 
-	function createField( labelText, className, value, maxLength ) {
+	function createField( labelText, className, value, maxLength, hintText ) {
 		const wrapper = createElement( 'label', 'opti-pict-seo__field' );
 		wrapper.appendChild( createElement( 'span', '', labelText ) );
 		const input = document.createElement( 'input' );
@@ -166,6 +166,7 @@
 		input.value = value || '';
 		if ( maxLength ) input.maxLength = maxLength;
 		wrapper.appendChild( input );
+		if ( hintText ) wrapper.appendChild( createElement( 'span', 'description', hintText ) );
 		return { wrapper, input };
 	}
 
@@ -189,7 +190,7 @@
 		const editor = createElement( 'div', 'opti-pict-seo-item__editor' );
 		const alt = createField( 'Texte alternatif', 'opti-pict-seo__alt', item.altText, config.maxAltLength );
 		const title = createField( 'Titre du média', 'opti-pict-seo__title', item.mediaTitle, 80 );
-		const slug = createField( 'Nom conseillé (sans extension)', 'opti-pict-seo__slug', item.slug, 80 );
+		const slug = createField( 'Slug de la page média', 'opti-pict-seo__slug', item.slug, 80, 'Modifie l’adresse de la page de pièce jointe, pas le nom du fichier image.' );
 		editor.appendChild( alt.wrapper );
 
 		const contextLabel = createElement( 'label', 'opti-pict-seo__field opti-pict-seo__context' );

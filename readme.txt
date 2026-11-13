@@ -22,7 +22,7 @@ Les originaux ne sont jamais supprimés. Une restauration globale ou individuell
 
 Les anciennes URLs JPEG/PNG des balises Image sont adaptées au moment de l’affichage dans le document HTML public, y compris dans les en-têtes, pieds de page, widgets et constructeurs de pages compatibles, sans modifier le contenu enregistré. Après une mise à jour en production, le cache de page et le CDN doivent être purgés afin de régénérer le HTML.
 
-Le module Référencement peut utiliser l’API OpenAI pour proposer un texte alternatif, un titre de média et un nom lisible à partir de l’image et des pages où elle est réellement utilisée. Le contexte général du site fournit du vocabulaire, mais n’est jamais considéré comme une preuve qu’une prestation concerne une photo. Chaque proposition doit être validée avant application.
+Le module Référencement peut utiliser l’API OpenAI pour proposer un texte alternatif, un titre de média et un slug de page média (le nom du fichier image n’est pas modifié) à partir de l’image et des pages où elle est réellement utilisée. Le contexte général du site fournit du vocabulaire, mais n’est jamais considéré comme une preuve qu’une prestation concerne une photo. Chaque proposition doit être validée avant application.
 
 L’utilisation de l’IA est facultative. Elle nécessite une clé API et une facturation OpenAI API distinctes. Aucune clé commune n’est incluse dans l’extension.
 
